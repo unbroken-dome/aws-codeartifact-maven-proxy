@@ -1,0 +1,213 @@
+:version: 0.1.0
+
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+
+:toc-placement!:
+endif::[]
+
+= AWS CodeArtifact Maven Proxy
+
+This project contains a lightweight, embeddable proxy server for AWS CodeArtifact Maven repositories. It
+automatically handles endpoint lookups and CodeArtifact authorization tokens.
+
+== Background
+
+AWS CodeArtifact is a great, cost-efficient service for hosting private Maven repositories. However, its
+authentication mechanism with its temporary tokens, while certainly adding a degree of security, is often
+cumbersome to work with:
+
+* Developers running a build from their local machine will have to install the AWS CLI and execute some
+  commands to look up endpoints and retrieve authorization tokens.
+
+* Access to the repositories is only actually needed for the initial build execution and when dependencies
+  have changed. For the majority of builds, the required artifacts can be served from a local cache, making
+  it unnecessary to even obtain an authorization token.
+
+== How It Works
+
+The proxy server is intended for _local_ use only. It acts as a virtual Maven repository server by forwarding
+URL paths that conform to the pattern
+
+----
+/<domain>/<domain-owner>/<repo>/<group>/<artifact>/...
+----
+
+to the appropriate AWS CodeArtifact repository endpoint for `domain`, `domain-owner` and `repo`.
+
+TIP: The special value `default` can be used for the `<domain-owner>` to use the default AWS account ID based on the
+proxy server's AWS credentials.
+
+
+.Fowarding example
+====
+
+For example, assuming that the account `123456789012` has a CodeArtifact domain `my-domain` containing a repository
+`my-repo` in the region `eu-west-1`, the proxy server forwards the request
+
+----
+GET /my-domain/123456789012/my-repo/com/example/my-package/1.2.3/my-package-1.2.3.jar
+----
+
+to
+
+----
+https://my-domain-123456789012.d.codeartifact.eu-west-1.amazonaws.com/maven/my-repo/com/example/my-package/1.2.3/my-package-1.2.3.jar
+----
+
+The forwarded request will also contain an appropriate `Authorization` header containing
+
+(The actual hostname is retrieved using the
+[https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_GetRepositoryEndpoint.html] API.)
+
+====
+
+It uses the standard AWS SDK authentication strategies (e.g., `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+environment variables). The AWS APIs are only called on demand.
+
+Authorization tokens are cached for the duration indicated by the AWS CodeArtifact API (maximum 12 hours). After
+that, the proxy server will automatically request a new token. To the user of the proxy server, this is completely
+transparent.
+
+Caching is in-memory only, so cached tokens are lost when the proxy server is shut down or restarted. There is no
+disk cache, both for security reasons and because the proxy's own AWS credentials might change between runs, making
+validation of cache entries about as expensive as just requesting new tokens.
+
+
+== Usage
+
+=== As Embedded Server (JVM)
+
+==== Prerequisites
+
+- JDK 1.8+
+- Kotlin: The server library is written in Kotlin and compiled against the Kotlin stdlib 1.5.20. If your
+  code uses a different version of Kotlin, there might be some compatibility issues.
+
+==== Steps
+
+- Include the artifact on your classpath:
++
+.Maven (pom.xml)
+[source,xml,subs="+attributes"]
+----
+<dependency>
+  <groupId>org.unbroken-dome.aws-codeartifact-maven-proxy</groupId>
+  <artifactId>aws-codeartifact-maven-proxy</artifactId>
+  <version>{version}</version>
+</dependency>
+----
++
+.Gradle (build.gradle / build.gradle.kts)
+[source,kotlin,subs="+attributes"]
+----
+dependencies {
+    implementation("org.unbroken-dome.aws-codeartifact-maven-proxy:aws-codeartifact-maven-proxy:{version}")
+}
+----
++
+The artifact is available on Maven Central.
+
+- Create an instance of `Options`
+
+- Call `CodeArtifactMavenProxyServer.start(options)`, which returns a `CompletableFuture` to the server
+  object allowing to `stop` it later. Synchronous/blocking variants `startSync` and `stopSync` are available as well.
+
+- The port can be configured in the `Options`, or set to `0` (default) to assign a random port. In the latter case,
+  the actual port on which the server is listening can be queried using the `actualPort` property.
+
+
+=== Using the CLI
+
+- Download the latest `aws-codeartifact-maven-proxy-cli` archive from the releases page and extract it
+
+- Run `./aws-codeartifact-maven-proxy` to start the server. Ctrl+C to stop.
+
+If started without any arguments, the server will start listening on a random port, which can be retrieved from the
+logs.
+
+The following command-line arguments are available:
+
+
+|===
+| Option | Description
+
+| `--bind <address>`
+
+  `-b <address>`
+| Bind to the given address instead of `localhost` / `127.0.0.1`.
+
+| `--port <port>`
+
+  `-p <port>`
+| Local port to listen on. Set to `0` to choose a random port.
+
+| `--debug`
+| Show DEBUG-level logs.
+
+| `--aws-debug`
+| Show DEBUG-level logs for the AWS SDK.
+
+| `--token-ttl <duration>`
+
+  `-t <duration>`
+| TTL to request for authorization tokens from AWS CodeArtifact. This can be specified as a number of seconds
+(e.g. `300`) or as a duration string like `1h30m`.
+
+A value of `0` (zero) will set the expiration of the authorization token to the same
+expiration of the user's role's temporary credentials.
+
+If not set, uses the defaults of the service (currently 12 hours).
+
+| `--endpoint-ttl <duration>`
+| TTL for caching AWS CodeArtifact repository endpoints. By default, these will be cached
+  indefinitely (until the server is stopped).
+
+| `--eager-init`
+| If this flag is used, certain setup tasks (like initializing the AWS clients) are done when
+  the server starts. By default, all initialization is done lazily when it is actually needed,
+  i.e. on the first request.
+
+| `--wiretap [ all \| targets ]`
+| Specify a list of targets to enable "wiretap" logging on TRACE level. Valid targets are
+  `raw`, `http` and `ssl`.
+
+Multiple targets can be specified as a comma-separated list, e.g.
+  `--wiretap raw,http`.
+
+The value `all` (or just `--wiretap`) will enable wiretap logging
+for all targets.
+
+|===
+
+
+
+=== Using a Docker image
+
+Currently, the Docker image is not published to a public registry, but you can easily create it on your local Docker
+host with:
+
+----
+./gradlew :cli:jibDockerBuild
+----
+
+The environment variables or files for the desired AWS authentication strategy must be passed to the Docker image,
+and the port should be forwarded to the host. (Remember to bind to 127.0.0.1 on the host, otherwise the server will
+be public in your network!)
+
+----
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_REGION=...
+
+docker run -d --name aws-codeartifact-maven-proxy \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION \
+  -p 127.0.0.1:8080:8080 \
+  unbroken-dome:aws-codeartifact-maven-proxy:<version> -b 0.0.0.0 -p 8080
+----
+
+Other CLI arguments can be used as described above.
