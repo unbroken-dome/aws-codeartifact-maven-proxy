@@ -27,6 +27,7 @@ import javax.net.ssl.SSLContext
  * own initializer handlers on a [Bootstrap].
  */
 internal class ProxyBackendChannelInitializer(
+    wiretapLogLevel: LogLevel = LogLevel.TRACE,
     private val sslContextProvider: () -> SSLContext = { SSLContext.getDefault() }
 ) {
 
@@ -39,9 +40,8 @@ internal class ProxyBackendChannelInitializer(
     }
 
 
-    private val sslLoggingHandler = LoggingHandler(WiretapLoggerNames.BackendSsl, LogLevel.TRACE, ByteBufFormat.SIMPLE)
-    private val rawLoggingHandler = LoggingHandler(WiretapLoggerNames.BackendRaw, LogLevel.TRACE)
-    private val httpLoggingHandler = LoggingHandler(WiretapLoggerNames.BackendHttp, LogLevel.TRACE)
+    private val sslLoggingHandler = LoggingHandler(WiretapLoggerNames.BackendSsl, wiretapLogLevel, ByteBufFormat.SIMPLE)
+    private val httpLoggingHandler = LoggingHandler(WiretapLoggerNames.BackendHttp, wiretapLogLevel)
     private val triggerSslHandshakeHandler = TriggerSslHandshakeHandler()
     private val notifyActiveHandler = NotifyActiveHandler()
 
@@ -65,7 +65,7 @@ internal class ProxyBackendChannelInitializer(
         }
 
         pipeline.addLast(
-            rawLoggingHandler,
+            //rawLoggingHandler,
             notifyActiveHandler,
             HttpClientCodec(),
             HttpConnectionCloseClientHandler(true),

@@ -189,7 +189,12 @@ private constructor(
          *
          * If zero (the default), use a default number of threads based on the number of available processors.
          */
-        val workerThreads: Int = 0
+        val workerThreads: Int = 0,
+
+        /**
+         * The log level to use for wiretap logging.
+         */
+        val wiretapLogLevel: LogLevel = LogLevel.TRACE,
     )
 
 
@@ -251,7 +256,9 @@ private constructor(
                         .option(ChannelOption.AUTO_READ, false)
                 }
 
-            val backendChannelInitializer = ProxyBackendChannelInitializer()
+            val backendChannelInitializer = ProxyBackendChannelInitializer(
+                wiretapLogLevel = options.wiretapLogLevel.nettyLogLevel
+            )
             val backendChannelPoolMap = PerRemoteChannelPoolMap.create(backendBootstrapFactory) { channel ->
                 backendChannelInitializer.initChannel(channel)
             }
@@ -270,7 +277,9 @@ private constructor(
                     }
                 })
                 .childHandler(
-                    ProxyFrontendChannelInitializer(proxyRequestHandler)
+                    ProxyFrontendChannelInitializer(
+                        options.wiretapLogLevel.nettyLogLevel, proxyRequestHandler
+                    )
                 )
                 .childOption(ChannelOption.AUTO_READ, false)
 

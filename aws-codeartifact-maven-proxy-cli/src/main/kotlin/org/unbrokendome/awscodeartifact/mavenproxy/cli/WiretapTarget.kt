@@ -7,7 +7,6 @@ import java.util.*
 internal enum class WiretapTarget(val cliName: String, val loggerNames: List<String>) {
 
     SSL("ssl", listOf(WiretapLoggerNames.BackendSsl)),
-    RAW("raw", listOf(WiretapLoggerNames.FrontendRaw, WiretapLoggerNames.BackendRaw)),
     HTTP("http", listOf(WiretapLoggerNames.FrontendHttp, WiretapLoggerNames.BackendHttp));
 
 

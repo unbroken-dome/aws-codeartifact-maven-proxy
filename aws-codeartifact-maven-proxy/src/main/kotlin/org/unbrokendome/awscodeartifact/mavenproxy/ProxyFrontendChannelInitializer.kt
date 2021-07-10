@@ -19,17 +19,16 @@ import org.unbrokendome.awscodeartifact.mavenproxy.wiretap.WiretapLoggerNames
  * @param requestHandler a [ProxyRequestHandler] for handling incoming requests
  */
 internal class ProxyFrontendChannelInitializer(
+    wiretapLogLevel: LogLevel = LogLevel.TRACE,
     private val requestHandler: ProxyRequestHandler
 ) : ChannelInitializer<SocketChannel>() {
 
-    private val rawLoggingHandler = LoggingHandler(WiretapLoggerNames.FrontendRaw, LogLevel.TRACE)
-    private val httpLoggingHandler = LoggingHandler(WiretapLoggerNames.FrontendHttp, LogLevel.TRACE)
+    private val httpLoggingHandler = LoggingHandler(WiretapLoggerNames.FrontendHttp, wiretapLogLevel)
     private val httpServerHeaderHandler = HttpServerHeaderHandler()
     private val httpStripResponseHeadersHandler = HttpStripResponseHeadersHandler(HttpHeaderNames.CONNECTION)
 
     override fun initChannel(ch: SocketChannel) {
         ch.pipeline().addLast(
-            rawLoggingHandler,
             HttpServerCodec(),
             HttpAccessLoggingHandler(),
             httpLoggingHandler,
