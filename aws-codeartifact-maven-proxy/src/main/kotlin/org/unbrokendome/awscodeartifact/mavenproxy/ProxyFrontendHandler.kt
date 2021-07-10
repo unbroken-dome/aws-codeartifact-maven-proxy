@@ -177,6 +177,8 @@ internal class ProxyFrontendHandler(
             }
             else -> {
                 ctx.fireChannelReadComplete()
+                logger.debug("Trigger next read from inbound")
+                ctx.read()
             }
         }
     }
@@ -256,7 +258,9 @@ internal class ProxyFrontendHandler(
 
     override fun write(ctx: ChannelHandlerContext, msg: Any, promise: ChannelPromise) {
         when (state) {
-            State.WAITING_FOR_BACKEND_RESPONSE, State.FORWARDING_BACKEND_RESPONSE -> {
+            State.FORWARDING_REQUEST,
+            State.WAITING_FOR_BACKEND_RESPONSE,
+            State.FORWARDING_BACKEND_RESPONSE -> {
                 if (msg is LastHttpContent) {
                     ctx.writeAndFlush(msg, promise)
                     afterResponseSent(ctx)
