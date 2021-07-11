@@ -24,6 +24,7 @@ import org.unbrokendome.awscodeartifact.mavenproxy.service.endpoint.CodeArtifact
 import org.unbrokendome.awscodeartifact.mavenproxy.service.endpoint.CodeArtifactEndpointService
 import java.net.URI
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 
 
 /**
@@ -254,8 +255,9 @@ internal class ProxyRequestHandler(
     ): CompletableFuture<T> =
         whenComplete { _, error ->
             if (error != null) {
+                val cause = (error as? CompletionException)?.cause ?: error
                 val wrappedError = CodeArtifactServiceException(
-                    "Failed to $operationDescription from AWS CodeArtifact: ${error.message}", error
+                    "Failed to $operationDescription from AWS CodeArtifact: ${cause.message}", cause
                 )
                 promise.setFailure(wrappedError)
             }

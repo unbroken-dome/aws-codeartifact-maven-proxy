@@ -4,6 +4,7 @@ import io.netty.channel.*
 import io.netty.handler.codec.http.*
 import io.netty.util.ReferenceCountUtil
 import org.slf4j.LoggerFactory
+import org.unbrokendome.awscodeartifact.mavenproxy.error.CodeArtifactServiceException
 import org.unbrokendome.awscodeartifact.mavenproxy.error.toHttpResponse
 import org.unbrokendome.awscodeartifact.mavenproxy.netty.handler.ForwardingChannelInboundHandler
 import org.unbrokendome.awscodeartifact.mavenproxy.netty.pool.closeAndReleaseIntoPool
@@ -248,6 +249,10 @@ internal class ProxyFrontendHandler(
                 }
             },
             onError = { error ->
+                if (error is CodeArtifactServiceException) {
+                    logger.error("CodeArtifact service error", error)
+                }
+
                 // There was an error in handling the request, or we could not open a channel to the
                 // backend. Send a response describing the error
                 sendErrorResponse(ctx, error)
