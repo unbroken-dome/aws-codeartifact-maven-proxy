@@ -7,6 +7,7 @@ netty = "4.1.65.Final"
 [libraries]
 
 awssdk-auth = { module = "software.amazon.awssdk:auth", version.ref = "awssdk" }
+awssdk-sso = { module = "software.amazon.awssdk:sso", version.ref = "awssdk" }
 awssdk-codeartifact = { module = "software.amazon.awssdk:codeartifact", version.ref = "awssdk" }
 awssdk-regions = { module = "software.amazon.awssdk:regions", version.ref = "awssdk" }
 

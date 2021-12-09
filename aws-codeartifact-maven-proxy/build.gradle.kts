@@ -13,6 +13,7 @@ dependencies {
 
     implementation(kotlin("stdlib-jdk8"))
 
+    implementation(libs.awssdk.sso)
     implementation(libs.awssdk.codeartifact)
     implementation(libs.caffeine)
     implementation(libs.bundles.netty.http)
